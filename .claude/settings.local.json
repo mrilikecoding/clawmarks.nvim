@@ -1,0 +1,6 @@
+{
+  "enabledMcpjsonServers": [
+    "clawmarks"
+  ],
+  "enableAllProjectMcpServers": true
+}

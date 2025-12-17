@@ -257,6 +257,12 @@ function M.setup(opts)
 
   -- Load initial data
   M.load()
+
+  -- Auto-load telescope extension
+  local has_telescope, telescope = pcall(require, 'telescope')
+  if has_telescope then
+    telescope.load_extension('clawmarks')
+  end
 end
 
 return M
