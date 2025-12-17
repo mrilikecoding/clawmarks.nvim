@@ -1,5 +1,5 @@
--- Default lazy.nvim spec for clawmarks.nvim
 return {
+  'mrilikecoding/clawmarks.nvim',
   event = 'VeryLazy',
   dependencies = {
     'nvim-telescope/telescope.nvim',
