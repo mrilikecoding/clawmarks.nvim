@@ -7,3 +7,8 @@
 # IDE
 .idea/
 .vscode/
+
+# Local config files
+.claude/
+.clawmarks.json
+.mcp.json
