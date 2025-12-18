@@ -14,7 +14,7 @@ function M.load()
 
   local file = io.open(filepath, 'r')
   if not file then
-    M._data = { version = 1, threads = {}, marks = {} }
+    M._data = { version = 1, trails = {}, clawmarks = {} }
     return M._data
   end
 
@@ -24,7 +24,7 @@ function M.load()
   local ok, data = pcall(vim.json.decode, content)
   if not ok then
     vim.notify('Clawmarks: Failed to parse ' .. cfg.clawmarks_file, vim.log.levels.ERROR)
-    M._data = { version = 1, threads = {}, marks = {} }
+    M._data = { version = 1, trails = {}, clawmarks = {} }
     return M._data
   end
 
@@ -55,90 +55,93 @@ function M.refresh()
   vim.notify('Clawmarks: Refreshed', vim.log.levels.INFO)
 end
 
--- Get all threads
-function M.get_threads(status)
+-- Get all trails
+function M.get_trails(status)
   local data = M.get_data()
+  if not data.trails then
+    return {}
+  end
   if not status then
-    return data.threads
+    return data.trails
   end
   local filtered = {}
-  for _, thread in ipairs(data.threads) do
-    if thread.status == status then
-      table.insert(filtered, thread)
+  for _, trail in ipairs(data.trails) do
+    if trail.status == status then
+      table.insert(filtered, trail)
     end
   end
   return filtered
 end
 
--- Get all marks (optionally filtered)
-function M.get_marks(opts)
+-- Get all clawmarks (optionally filtered)
+function M.get_clawmarks(opts)
   opts = opts or {}
   local data = M.get_data()
-  local marks = data.marks
+  local clawmarks = data.clawmarks or {}
 
-  if opts.thread_id then
+  if opts.trail_id then
     local filtered = {}
-    for _, mark in ipairs(marks) do
-      if mark.thread_id == opts.thread_id then
-        table.insert(filtered, mark)
+    for _, clawmark in ipairs(clawmarks) do
+      if clawmark.trail_id == opts.trail_id then
+        table.insert(filtered, clawmark)
       end
     end
-    marks = filtered
+    clawmarks = filtered
   end
 
   if opts.file then
     local filtered = {}
-    for _, mark in ipairs(marks) do
-      if mark.file == opts.file then
-        table.insert(filtered, mark)
+    for _, clawmark in ipairs(clawmarks) do
+      if clawmark.file == opts.file then
+        table.insert(filtered, clawmark)
       end
     end
-    marks = filtered
+    clawmarks = filtered
   end
 
   if opts.type then
     local filtered = {}
-    for _, mark in ipairs(marks) do
-      if mark.type == opts.type then
-        table.insert(filtered, mark)
+    for _, clawmark in ipairs(clawmarks) do
+      if clawmark.type == opts.type then
+        table.insert(filtered, clawmark)
       end
     end
-    marks = filtered
+    clawmarks = filtered
   end
 
   if opts.tag then
     local filtered = {}
-    for _, mark in ipairs(marks) do
-      for _, t in ipairs(mark.tags or {}) do
+    for _, clawmark in ipairs(clawmarks) do
+      for _, t in ipairs(clawmark.tags or {}) do
         if t == opts.tag then
-          table.insert(filtered, mark)
+          table.insert(filtered, clawmark)
           break
         end
       end
     end
-    marks = filtered
+    clawmarks = filtered
   end
 
-  return marks
+  return clawmarks
 end
 
--- Get mark by ID
-function M.get_mark(mark_id)
+-- Get clawmark by ID
+function M.get_clawmark(clawmark_id)
   local data = M.get_data()
-  for _, mark in ipairs(data.marks) do
-    if mark.id == mark_id then
-      return mark
+  for _, clawmark in ipairs(data.clawmarks or {}) do
+    if clawmark.id == clawmark_id then
+      return clawmark
     end
   end
   return nil
 end
 
--- Get thread by ID
-function M.get_thread(thread_id)
+-- Get trail by ID
+function M.get_trail(trail_id)
   local data = M.get_data()
-  for _, thread in ipairs(data.threads) do
-    if thread.id == thread_id then
-      return thread
+  for _, trail in ipairs(data.trails or {}) do
+    if trail.id == trail_id then
+      return trail
     end
   end
   return nil
@@ -148,8 +151,8 @@ end
 function M.get_tags()
   local data = M.get_data()
   local tag_set = {}
-  for _, mark in ipairs(data.marks) do
-    for _, tag in ipairs(mark.tags or {}) do
+  for _, clawmark in ipairs(data.clawmarks or {}) do
+    for _, tag in ipairs(clawmark.tags or {}) do
       tag_set[tag] = true
     end
   end
@@ -161,10 +164,10 @@ function M.get_tags()
   return tags
 end
 
--- Get references for a mark
-function M.get_references(mark_id)
-  local mark = M.get_mark(mark_id)
-  if not mark then
+-- Get references for a clawmark
+function M.get_references(clawmark_id)
+  local clawmark = M.get_clawmark(clawmark_id)
+  if not clawmark then
     return { outgoing = {}, incoming = {} }
   end
 
@@ -173,18 +176,18 @@ function M.get_references(mark_id)
   local incoming = {}
 
   -- Outgoing references
-  for _, ref_id in ipairs(mark.references or {}) do
-    local ref_mark = M.get_mark(ref_id)
-    if ref_mark then
-      table.insert(outgoing, ref_mark)
+  for _, ref_id in ipairs(clawmark.references or {}) do
+    local ref_clawmark = M.get_clawmark(ref_id)
+    if ref_clawmark then
+      table.insert(outgoing, ref_clawmark)
     end
   end
 
   -- Incoming references
-  for _, m in ipairs(data.marks) do
-    for _, ref_id in ipairs(m.references or {}) do
-      if ref_id == mark_id then
-        table.insert(incoming, m)
+  for _, c in ipairs(data.clawmarks or {}) do
+    for _, ref_id in ipairs(c.references or {}) do
+      if ref_id == clawmark_id then
+        table.insert(incoming, c)
         break
       end
     end
@@ -193,17 +196,17 @@ function M.get_references(mark_id)
   return { outgoing = outgoing, incoming = incoming }
 end
 
--- Jump to a mark
-function M.jump_to_mark(mark)
+-- Jump to a clawmark
+function M.jump_to_clawmark(clawmark)
   local cwd = vim.fn.getcwd()
-  local filepath = cwd .. '/' .. mark.file
+  local filepath = cwd .. '/' .. clawmark.file
 
   -- Open the file
   vim.cmd('edit ' .. vim.fn.fnameescape(filepath))
 
   -- Jump to line and column
-  local line = mark.line or 1
-  local col = (mark.column or 1) - 1 -- nvim columns are 0-indexed
+  local line = clawmark.line or 1
+  local col = (clawmark.column or 1) - 1 -- nvim columns are 0-indexed
   vim.api.nvim_win_set_cursor(0, { line, col })
 
   -- Center the view
@@ -260,20 +263,20 @@ function M.setup(opts)
       '# Clawmarks.nvim',
       '',
       '## Telescope Pickers',
-      '  :Telescope clawmarks threads   Browse conversation threads',
-      '  :Telescope clawmarks marks     Browse all marks',
-      '  :Telescope clawmarks tags      Browse by tag',
+      '  :Telescope clawmarks trails      Browse exploration trails',
+      '  :Telescope clawmarks clawmarks   Browse all clawmarks',
+      '  :Telescope clawmarks tags        Browse by tag',
       '',
       '## Picker Keybindings',
-      '  <CR>      Jump to mark / Open thread marks',
-      '  <C-r>     Show references for selected mark',
+      '  <CR>      Jump to clawmark / Open trail clawmarks',
+      '  <C-r>     Show references for selected clawmark',
       '',
       '## Commands',
       '  :ClawmarksRefresh       Reload from .clawmarks.json',
       '  :ClawmarksToggleSigns   Toggle gutter signs',
       '  :ClawmarksHelp          Show this help',
       '',
-      '## Mark Types',
+      '## Clawmark Types',
       '  ◆  decision       A choice or decision made',
       '  ?  question       Needs resolution',
       '  !  change_needed  Code to modify',
@@ -282,7 +285,7 @@ function M.setup(opts)
       '  ⊕  dependency     Something this depends on',
       '',
       '## Gutter Signs',
-      '  Marks appear in the sign column when viewing files.',
+      '  Clawmarks appear in the sign column when viewing files.',
       '  Toggle with :ClawmarksToggleSigns',
     }
     vim.api.nvim_echo({{ table.concat(help, '\n'), 'Normal' }}, true, {})

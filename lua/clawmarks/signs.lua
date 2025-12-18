@@ -51,27 +51,27 @@ function M.refresh_buffer(bufnr)
   -- Clear existing signs
   M.clear_buffer(bufnr)
 
-  -- Get marks for this file
+  -- Get clawmarks for this file
   local clawmarks = require('clawmarks')
-  local marks = clawmarks.get_marks({ file = filepath })
+  local cms = clawmarks.get_clawmarks({ file = filepath })
 
   -- Place signs
-  for _, mark in ipairs(marks) do
-    local sign_name = 'Clawmark_' .. (mark.type or 'reference')
+  for _, cm in ipairs(cms) do
+    local sign_name = 'Clawmark_' .. (cm.type or 'reference')
 
     -- Place sign
     vim.fn.sign_place(0, 'clawmarks', sign_name, bufnr, {
-      lnum = mark.line,
+      lnum = cm.line,
       priority = 10,
     })
 
     -- Add virtual text with annotation (truncated)
-    local annotation = mark.annotation or ''
+    local annotation = cm.annotation or ''
     if #annotation > 60 then
       annotation = annotation:sub(1, 57) .. '...'
     end
 
-    vim.api.nvim_buf_set_extmark(bufnr, ns_id, mark.line - 1, 0, {
+    vim.api.nvim_buf_set_extmark(bufnr, ns_id, cm.line - 1, 0, {
       virt_text = { { ' ◀ ' .. annotation, 'Comment' } },
       virt_text_pos = 'eol',
     })

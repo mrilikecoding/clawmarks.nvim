@@ -16,7 +16,7 @@ local entry_display = require('telescope.pickers.entry_display')
 
 local clawmarks = require('clawmarks')
 
--- Mark type icons for display
+-- Clawmark type icons for display
 local type_icons = {
   decision = '◆',
   question = '?',
@@ -28,17 +28,17 @@ local type_icons = {
 
 local M = {}
 
--- ===================== Threads Picker =====================
+-- ===================== Trails Picker =====================
 
-function M.threads(opts)
+function M.trails(opts)
   opts = opts or {}
 
   clawmarks.load() -- Refresh data
 
-  local threads = clawmarks.get_threads()
+  local trails = clawmarks.get_trails()
 
-  if #threads == 0 then
-    vim.notify('No clawmarks threads found', vim.log.levels.INFO)
+  if #trails == 0 then
+    vim.notify('No clawmarks trails found', vim.log.levels.INFO)
     return
   end
 
@@ -51,58 +51,58 @@ function M.threads(opts)
   })
 
   local make_display = function(entry)
-    local status_hl = entry.thread.status == 'active' and 'String' or 'Comment'
+    local status_hl = entry.trail.status == 'active' and 'String' or 'Comment'
     return displayer({
-      { '[' .. entry.thread.status .. ']', status_hl },
-      { entry.thread.name },
+      { '[' .. entry.trail.status .. ']', status_hl },
+      { entry.trail.name },
     })
   end
 
   pickers
     .new(opts, {
-      prompt_title = 'Clawmarks Threads',
+      prompt_title = 'Clawmarks Trails',
       finder = finders.new_table({
-        results = threads,
-        entry_maker = function(thread)
-          local marks = clawmarks.get_marks({ thread_id = thread.id })
+        results = trails,
+        entry_maker = function(trail)
+          local trail_clawmarks = clawmarks.get_clawmarks({ trail_id = trail.id })
           return {
-            value = thread.id,
+            value = trail.id,
             display = make_display,
-            ordinal = thread.name .. ' ' .. (thread.description or ''),
-            thread = thread,
-            mark_count = #marks,
+            ordinal = trail.name .. ' ' .. (trail.description or ''),
+            trail = trail,
+            clawmark_count = #trail_clawmarks,
           }
         end,
       }),
       sorter = conf.generic_sorter(opts),
       previewer = previewers.new_buffer_previewer({
-        title = 'Thread Details',
+        title = 'Trail Details',
         define_preview = function(self, entry)
-          local thread = entry.thread
-          local marks = clawmarks.get_marks({ thread_id = thread.id })
+          local trail = entry.trail
+          local trail_clawmarks = clawmarks.get_clawmarks({ trail_id = trail.id })
 
           local lines = {
-            '# ' .. thread.name,
+            '# ' .. trail.name,
             '',
-            'Status: ' .. thread.status,
-            'Created: ' .. (thread.created_at or 'unknown'),
-            'Marks: ' .. #marks,
+            'Status: ' .. trail.status,
+            'Created: ' .. (trail.created_at or 'unknown'),
+            'Clawmarks: ' .. #trail_clawmarks,
             '',
           }
 
-          if thread.description then
+          if trail.description then
             table.insert(lines, 'Description:')
-            table.insert(lines, thread.description)
+            table.insert(lines, trail.description)
             table.insert(lines, '')
           end
 
-          if #marks > 0 then
-            table.insert(lines, '## Marks')
+          if #trail_clawmarks > 0 then
+            table.insert(lines, '## Clawmarks')
             table.insert(lines, '')
-            for _, mark in ipairs(marks) do
-              local icon = type_icons[mark.type] or '•'
-              table.insert(lines, icon .. ' ' .. mark.file .. ':' .. mark.line)
-              table.insert(lines, '  ' .. mark.annotation)
+            for _, cm in ipairs(trail_clawmarks) do
+              local icon = type_icons[cm.type] or '•'
+              table.insert(lines, icon .. ' ' .. cm.file .. ':' .. cm.line)
+              table.insert(lines, '  ' .. cm.annotation)
               table.insert(lines, '')
             end
           end
@@ -115,8 +115,8 @@ function M.threads(opts)
         actions.select_default:replace(function()
           actions.close(prompt_bufnr)
           local selection = action_state.get_selected_entry()
-          -- Open marks picker for this thread
-          M.marks({ thread_id = selection.value })
+          -- Open clawmarks picker for this trail
+          M.clawmarks({ trail_id = selection.value })
         end)
         return true
       end,
@@ -124,21 +124,21 @@ function M.threads(opts)
     :find()
 end
 
--- ===================== Marks Picker =====================
+-- ===================== Clawmarks Picker =====================
 
-function M.marks(opts)
+function M.clawmarks(opts)
   opts = opts or {}
 
   clawmarks.load() -- Refresh data
 
-  local marks = clawmarks.get_marks({
-    thread_id = opts.thread_id,
+  local cms = clawmarks.get_clawmarks({
+    trail_id = opts.trail_id,
     file = opts.file,
     type = opts.type,
     tag = opts.tag,
   })
 
-  if #marks == 0 then
+  if #cms == 0 then
     vim.notify('No clawmarks found', vim.log.levels.INFO)
     return
   end
@@ -153,12 +153,12 @@ function M.marks(opts)
   })
 
   local make_display = function(entry)
-    local mark = entry.mark
-    local icon = type_icons[mark.type] or '•'
-    local location = mark.file .. ':' .. mark.line
+    local cm = entry.clawmark
+    local icon = type_icons[cm.type] or '•'
+    local location = cm.file .. ':' .. cm.line
 
     -- Truncate annotation for display
-    local annotation = mark.annotation or ''
+    local annotation = cm.annotation or ''
     if #annotation > 50 then
       annotation = annotation:sub(1, 47) .. '...'
     end
@@ -174,16 +174,16 @@ function M.marks(opts)
     .new(opts, {
       prompt_title = 'Clawmarks',
       finder = finders.new_table({
-        results = marks,
-        entry_maker = function(mark)
+        results = cms,
+        entry_maker = function(cm)
           return {
-            value = mark.id,
+            value = cm.id,
             display = make_display,
-            ordinal = mark.file .. ' ' .. mark.annotation .. ' ' .. table.concat(mark.tags or {}, ' '),
-            mark = mark,
-            filename = vim.fn.getcwd() .. '/' .. mark.file,
-            lnum = mark.line,
-            col = mark.column or 1,
+            ordinal = cm.file .. ' ' .. cm.annotation .. ' ' .. table.concat(cm.tags or {}, ' '),
+            clawmark = cm,
+            filename = vim.fn.getcwd() .. '/' .. cm.file,
+            lnum = cm.line,
+            col = cm.column or 1,
           }
         end,
       }),
@@ -193,19 +193,19 @@ function M.marks(opts)
         actions.select_default:replace(function()
           actions.close(prompt_bufnr)
           local selection = action_state.get_selected_entry()
-          clawmarks.jump_to_mark(selection.mark)
+          clawmarks.jump_to_clawmark(selection.clawmark)
         end)
 
         -- <C-r> to show references
         map('i', '<C-r>', function()
           local selection = action_state.get_selected_entry()
           actions.close(prompt_bufnr)
-          M.references({ mark_id = selection.value })
+          M.references({ clawmark_id = selection.value })
         end)
         map('n', '<C-r>', function()
           local selection = action_state.get_selected_entry()
           actions.close(prompt_bufnr)
-          M.references({ mark_id = selection.value })
+          M.references({ clawmark_id = selection.value })
         end)
 
         return true
@@ -234,10 +234,10 @@ function M.tags(opts)
       finder = finders.new_table({
         results = tags,
         entry_maker = function(tag)
-          local marks = clawmarks.get_marks({ tag = tag })
+          local cms = clawmarks.get_clawmarks({ tag = tag })
           return {
             value = tag,
-            display = tag .. ' (' .. #marks .. ' marks)',
+            display = tag .. ' (' .. #cms .. ' clawmarks)',
             ordinal = tag,
           }
         end,
@@ -247,7 +247,7 @@ function M.tags(opts)
         actions.select_default:replace(function()
           actions.close(prompt_bufnr)
           local selection = action_state.get_selected_entry()
-          M.marks({ tag = selection.value })
+          M.clawmarks({ tag = selection.value })
         end)
         return true
       end,
@@ -260,27 +260,27 @@ end
 function M.references(opts)
   opts = opts or {}
 
-  if not opts.mark_id then
-    vim.notify('No mark_id provided', vim.log.levels.ERROR)
+  if not opts.clawmark_id then
+    vim.notify('No clawmark_id provided', vim.log.levels.ERROR)
     return
   end
 
   clawmarks.load()
 
-  local refs = clawmarks.get_references(opts.mark_id)
-  local source_mark = clawmarks.get_mark(opts.mark_id)
+  local refs = clawmarks.get_references(opts.clawmark_id)
+  local source_clawmark = clawmarks.get_clawmark(opts.clawmark_id)
 
   local all_refs = {}
 
-  for _, mark in ipairs(refs.outgoing) do
-    table.insert(all_refs, { mark = mark, direction = 'outgoing' })
+  for _, cm in ipairs(refs.outgoing) do
+    table.insert(all_refs, { clawmark = cm, direction = 'outgoing' })
   end
-  for _, mark in ipairs(refs.incoming) do
-    table.insert(all_refs, { mark = mark, direction = 'incoming' })
+  for _, cm in ipairs(refs.incoming) do
+    table.insert(all_refs, { clawmark = cm, direction = 'incoming' })
   end
 
   if #all_refs == 0 then
-    vim.notify('No references found for this mark', vim.log.levels.INFO)
+    vim.notify('No references found for this clawmark', vim.log.levels.INFO)
     return
   end
 
@@ -295,12 +295,12 @@ function M.references(opts)
   })
 
   local make_display = function(entry)
-    local mark = entry.ref.mark
-    local icon = type_icons[mark.type] or '•'
-    local location = mark.file .. ':' .. mark.line
+    local cm = entry.ref.clawmark
+    local icon = type_icons[cm.type] or '•'
+    local location = cm.file .. ':' .. cm.line
     local direction_icon = entry.ref.direction == 'outgoing' and '→' or '←'
 
-    local annotation = mark.annotation or ''
+    local annotation = cm.annotation or ''
     if #annotation > 40 then
       annotation = annotation:sub(1, 37) .. '...'
     end
@@ -314,8 +314,8 @@ function M.references(opts)
   end
 
   local title = 'References'
-  if source_mark then
-    title = 'References for ' .. source_mark.file .. ':' .. source_mark.line
+  if source_clawmark then
+    title = 'References for ' .. source_clawmark.file .. ':' .. source_clawmark.line
   end
 
   pickers
@@ -325,14 +325,14 @@ function M.references(opts)
         results = all_refs,
         entry_maker = function(ref)
           return {
-            value = ref.mark.id,
+            value = ref.clawmark.id,
             display = make_display,
-            ordinal = ref.mark.file .. ' ' .. ref.mark.annotation,
+            ordinal = ref.clawmark.file .. ' ' .. ref.clawmark.annotation,
             ref = ref,
-            mark = ref.mark,
-            filename = vim.fn.getcwd() .. '/' .. ref.mark.file,
-            lnum = ref.mark.line,
-            col = ref.mark.column or 1,
+            clawmark = ref.clawmark,
+            filename = vim.fn.getcwd() .. '/' .. ref.clawmark.file,
+            lnum = ref.clawmark.line,
+            col = ref.clawmark.column or 1,
           }
         end,
       }),
@@ -342,19 +342,19 @@ function M.references(opts)
         actions.select_default:replace(function()
           actions.close(prompt_bufnr)
           local selection = action_state.get_selected_entry()
-          clawmarks.jump_to_mark(selection.mark)
+          clawmarks.jump_to_clawmark(selection.clawmark)
         end)
 
-        -- <C-r> to show references of selected mark
+        -- <C-r> to show references of selected clawmark
         map('i', '<C-r>', function()
           local selection = action_state.get_selected_entry()
           actions.close(prompt_bufnr)
-          M.references({ mark_id = selection.value })
+          M.references({ clawmark_id = selection.value })
         end)
         map('n', '<C-r>', function()
           local selection = action_state.get_selected_entry()
           actions.close(prompt_bufnr)
-          M.references({ mark_id = selection.value })
+          M.references({ clawmark_id = selection.value })
         end)
 
         return true
@@ -365,10 +365,9 @@ end
 
 return telescope.register_extension({
   exports = {
-    threads = M.threads,
-    marks = M.marks,
+    trails = M.trails,
+    clawmarks = M.clawmarks,
     tags = M.tags,
     references = M.references,
-    clawmarks = M.marks, -- default picker
   },
 })
