@@ -255,6 +255,39 @@ function M.setup(opts)
     require('clawmarks.signs').toggle()
   end, { desc = 'Toggle clawmarks signs' })
 
+  vim.api.nvim_create_user_command('ClawmarksHelp', function()
+    local help = {
+      '# Clawmarks.nvim',
+      '',
+      '## Telescope Pickers',
+      '  :Telescope clawmarks threads   Browse conversation threads',
+      '  :Telescope clawmarks marks     Browse all marks',
+      '  :Telescope clawmarks tags      Browse by tag',
+      '',
+      '## Picker Keybindings',
+      '  <CR>      Jump to mark / Open thread marks',
+      '  <C-r>     Show references for selected mark',
+      '',
+      '## Commands',
+      '  :ClawmarksRefresh       Reload from .clawmarks.json',
+      '  :ClawmarksToggleSigns   Toggle gutter signs',
+      '  :ClawmarksHelp          Show this help',
+      '',
+      '## Mark Types',
+      '  ◆  decision       A choice or decision made',
+      '  ?  question       Needs resolution',
+      '  !  change_needed  Code to modify',
+      '  →  reference      Context or related code',
+      '  ⇄  alternative    Another approach considered',
+      '  ⊕  dependency     Something this depends on',
+      '',
+      '## Gutter Signs',
+      '  Marks appear in the sign column when viewing files.',
+      '  Toggle with :ClawmarksToggleSigns',
+    }
+    vim.api.nvim_echo({{ table.concat(help, '\n'), 'Normal' }}, true, {})
+  end, { desc = 'Show clawmarks help' })
+
   -- Load initial data
   M.load()
 
