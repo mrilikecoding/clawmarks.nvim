@@ -126,6 +126,98 @@ end
 
 -- ===================== Clawmarks Picker =====================
 
+-- Custom previewer that shows annotation + file content
+local function clawmark_previewer(opts)
+  return previewers.new_buffer_previewer({
+    title = 'Clawmark Preview',
+    define_preview = function(self, entry)
+      local cm = entry.clawmark
+      local bufnr = self.state.bufnr
+
+      -- Build annotation header
+      local lines = {
+        '┌─ Annotation ─────────────────────────────────────────────────────────────────',
+        '',
+      }
+
+      -- Word-wrap the annotation
+      local annotation = cm.annotation or '(no annotation)'
+      local wrap_width = 78
+      for i = 1, #annotation, wrap_width do
+        table.insert(lines, '  ' .. annotation:sub(i, i + wrap_width - 1))
+      end
+
+      table.insert(lines, '')
+
+      -- Add metadata
+      local icon = type_icons[cm.type] or '•'
+      table.insert(lines, '  Type: ' .. icon .. ' ' .. (cm.type or 'unknown'))
+      if cm.tags and #cm.tags > 0 then
+        table.insert(lines, '  Tags: ' .. table.concat(cm.tags, ', '))
+      end
+
+      table.insert(lines, '')
+      table.insert(lines, '└──────────────────────────────────────────────────────────────────────────────')
+      table.insert(lines, '')
+
+      local header_end = #lines
+
+      -- Read file content around the mark
+      local filepath = vim.fn.getcwd() .. '/' .. cm.file
+      local file_lines = {}
+      local f = io.open(filepath, 'r')
+      if f then
+        for line in f:lines() do
+          table.insert(file_lines, line)
+        end
+        f:close()
+      end
+
+      -- Show context around the marked line
+      local context = 10
+      local start_line = math.max(1, cm.line - context)
+      local end_line = math.min(#file_lines, cm.line + context)
+
+      table.insert(lines, cm.file .. ':' .. cm.line)
+      table.insert(lines, string.rep('─', 80))
+
+      for i = start_line, end_line do
+        local prefix = i == cm.line and '→ ' or '  '
+        local line_num = string.format('%4d', i)
+        table.insert(lines, prefix .. line_num .. ' │ ' .. (file_lines[i] or ''))
+      end
+
+      vim.api.nvim_buf_set_lines(bufnr, 0, -1, false, lines)
+
+      -- Apply highlighting
+      local ns = vim.api.nvim_create_namespace('clawmarks_preview')
+
+      -- Highlight annotation box
+      for i = 0, header_end - 1 do
+        vim.api.nvim_buf_add_highlight(bufnr, ns, 'Comment', i, 0, -1)
+      end
+
+      -- Highlight the marked line
+      local marked_line_idx = header_end + 2 + (cm.line - start_line)
+      if marked_line_idx < #lines then
+        vim.api.nvim_buf_add_highlight(bufnr, ns, 'CursorLine', marked_line_idx, 0, -1)
+        vim.api.nvim_buf_add_highlight(bufnr, ns, 'WarningMsg', marked_line_idx, 0, 2)
+      end
+
+      -- Try to set filetype for syntax highlighting of code portion
+      local ext = cm.file:match('%.([^%.]+)$')
+      if ext then
+        local ft_map = {
+          lua = 'lua', py = 'python', js = 'javascript', ts = 'typescript',
+          tsx = 'typescriptreact', jsx = 'javascriptreact', rb = 'ruby',
+          rs = 'rust', go = 'go', c = 'c', cpp = 'cpp', h = 'c',
+        }
+        -- We keep it as plaintext to preserve our custom highlighting
+      end
+    end,
+  })
+end
+
 function M.clawmarks(opts)
   opts = opts or {}
 
@@ -188,7 +280,7 @@ function M.clawmarks(opts)
         end,
       }),
       sorter = conf.generic_sorter(opts),
-      previewer = conf.grep_previewer(opts),
+      previewer = clawmark_previewer(opts),
       attach_mappings = function(prompt_bufnr, map)
         actions.select_default:replace(function()
           actions.close(prompt_bufnr)
