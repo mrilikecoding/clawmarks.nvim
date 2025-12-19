@@ -1,6 +1,12 @@
-# clawmarks.nvim
+<p align="center">
+  <img src="logo.png" alt="Clawmarks" width="128" height="128">
+</p>
 
-Neovim plugin for browsing [Clawmarks](https://github.com/mrilikecoding/clawmarks) - storybook-style annotated bookmarks created by LLM agents.
+<h1 align="center">clawmarks.nvim</h1>
+
+<p align="center">
+  Neovim plugin for browsing <a href="https://github.com/mrilikecoding/clawmarks">Clawmarks</a> - storybook-style annotated bookmarks created by LLM agents.
+</p>
 
 ## Features
 
