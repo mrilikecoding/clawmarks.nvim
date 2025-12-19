@@ -26,6 +26,25 @@ local type_icons = {
   dependency = '⊕',
 }
 
+-- Clawmark type labels for display
+local type_labels = {
+  decision = 'Decision',
+  question = 'Question',
+  change_needed = 'Change',
+  reference = 'Reference',
+  alternative = 'Alt',
+  dependency = 'Depends',
+}
+
+-- Shared layout config for better preview visibility
+local layout_config = {
+  horizontal = {
+    preview_width = 0.6,
+    width = 0.9,
+    height = 0.8,
+  },
+}
+
 local M = {}
 
 -- ===================== Trails Picker =====================
@@ -61,6 +80,8 @@ function M.trails(opts)
   pickers
     .new(opts, {
       prompt_title = 'Clawmarks Trails',
+      layout_strategy = 'horizontal',
+      layout_config = layout_config.horizontal,
       finder = finders.new_table({
         results = trails,
         entry_maker = function(trail)
@@ -235,11 +256,19 @@ function M.clawmarks(opts)
     return
   end
 
+  -- Build indexed results for numbered display
+  local indexed_cms = {}
+  for i, cm in ipairs(cms) do
+    table.insert(indexed_cms, { clawmark = cm, index = i })
+  end
+
   local displayer = entry_display.create({
     separator = ' ',
     items = {
-      { width = 2 }, -- icon
-      { width = 40 }, -- file:line
+      { width = 4 },  -- index "1. "
+      { width = 2 },  -- icon
+      { width = 10 }, -- type label
+      { width = 30 }, -- file:line
       { remaining = true }, -- annotation
     },
   })
@@ -247,35 +276,51 @@ function M.clawmarks(opts)
   local make_display = function(entry)
     local cm = entry.clawmark
     local icon = type_icons[cm.type] or '•'
+    local type_label = type_labels[cm.type] or cm.type
     local location = cm.file .. ':' .. cm.line
+    local index_str = entry.index .. '.'
 
     -- Truncate annotation for display
     local annotation = cm.annotation or ''
-    if #annotation > 50 then
-      annotation = annotation:sub(1, 47) .. '...'
+    if #annotation > 40 then
+      annotation = annotation:sub(1, 37) .. '...'
     end
 
     return displayer({
+      { index_str, 'TelescopeResultsNumber' },
       { icon, 'ClawmarkReference' },
+      { type_label, 'TelescopeResultsComment' },
       { location, 'TelescopeResultsIdentifier' },
       { annotation },
     })
   end
 
+  -- Build title with trail name if filtered
+  local title = 'Clawmarks'
+  if opts.trail_id then
+    local trail = clawmarks.get_trail(opts.trail_id)
+    if trail then
+      title = 'Clawmarks: ' .. trail.name
+    end
+  end
+
   pickers
     .new(opts, {
-      prompt_title = 'Clawmarks',
+      prompt_title = title,
+      layout_strategy = 'horizontal',
+      layout_config = layout_config.horizontal,
       finder = finders.new_table({
-        results = cms,
-        entry_maker = function(cm)
+        results = indexed_cms,
+        entry_maker = function(item)
           return {
-            value = cm.id,
+            value = item.clawmark.id,
             display = make_display,
-            ordinal = cm.file .. ' ' .. cm.annotation .. ' ' .. table.concat(cm.tags or {}, ' '),
-            clawmark = cm,
-            filename = vim.fn.getcwd() .. '/' .. cm.file,
-            lnum = cm.line,
-            col = cm.column or 1,
+            ordinal = item.clawmark.file .. ' ' .. item.clawmark.annotation .. ' ' .. table.concat(item.clawmark.tags or {}, ' '),
+            clawmark = item.clawmark,
+            index = item.index,
+            filename = vim.fn.getcwd() .. '/' .. item.clawmark.file,
+            lnum = item.clawmark.line,
+            col = item.clawmark.column or 1,
           }
         end,
       }),
@@ -298,6 +343,16 @@ function M.clawmarks(opts)
           local selection = action_state.get_selected_entry()
           actions.close(prompt_bufnr)
           M.references({ clawmark_id = selection.value })
+        end)
+
+        -- <C-t> to switch trails
+        map('i', '<C-t>', function()
+          actions.close(prompt_bufnr)
+          M.trails()
+        end)
+        map('n', '<C-t>', function()
+          actions.close(prompt_bufnr)
+          M.trails()
         end)
 
         return true
@@ -361,6 +416,7 @@ function M.references(opts)
 
   local refs = clawmarks.get_references(opts.clawmark_id)
   local source_clawmark = clawmarks.get_clawmark(opts.clawmark_id)
+  local source_trail_id = source_clawmark and source_clawmark.trail_id or nil
 
   local all_refs = {}
 
@@ -379,9 +435,10 @@ function M.references(opts)
   local displayer = entry_display.create({
     separator = ' ',
     items = {
-      { width = 3 }, -- direction arrow
-      { width = 2 }, -- icon
-      { width = 40 }, -- file:line
+      { width = 3 },  -- direction arrow
+      { width = 2 },  -- icon
+      { width = 16 }, -- trail indicator (for cross-trail)
+      { width = 25 }, -- file:line
       { remaining = true }, -- annotation
     },
   })
@@ -392,14 +449,30 @@ function M.references(opts)
     local location = cm.file .. ':' .. cm.line
     local direction_icon = entry.ref.direction == 'outgoing' and '→' or '←'
 
+    -- Show trail indicator if different from source trail
+    local trail_indicator = ''
+    if source_trail_id and cm.trail_id ~= source_trail_id then
+      local trail = clawmarks.get_trail(cm.trail_id)
+      if trail then
+        local trail_name = trail.name
+        if #trail_name > 12 then
+          trail_name = trail_name:sub(1, 11) .. '…'
+        end
+        trail_indicator = '[' .. trail_name .. ']'
+      else
+        trail_indicator = '[other]'
+      end
+    end
+
     local annotation = cm.annotation or ''
-    if #annotation > 40 then
-      annotation = annotation:sub(1, 37) .. '...'
+    if #annotation > 30 then
+      annotation = annotation:sub(1, 27) .. '...'
     end
 
     return displayer({
       { direction_icon, 'Comment' },
       { icon, 'ClawmarkReference' },
+      { trail_indicator, 'WarningMsg' },
       { location, 'TelescopeResultsIdentifier' },
       { annotation },
     })
@@ -413,6 +486,8 @@ function M.references(opts)
   pickers
     .new(opts, {
       prompt_title = title,
+      layout_strategy = 'horizontal',
+      layout_config = layout_config.horizontal,
       finder = finders.new_table({
         results = all_refs,
         entry_maker = function(ref)
@@ -447,6 +522,18 @@ function M.references(opts)
           local selection = action_state.get_selected_entry()
           actions.close(prompt_bufnr)
           M.references({ clawmark_id = selection.value })
+        end)
+
+        -- <C-p> to pivot to the clawmark's trail
+        map('i', '<C-p>', function()
+          local selection = action_state.get_selected_entry()
+          actions.close(prompt_bufnr)
+          M.clawmarks({ trail_id = selection.clawmark.trail_id })
+        end)
+        map('n', '<C-p>', function()
+          local selection = action_state.get_selected_entry()
+          actions.close(prompt_bufnr)
+          M.clawmarks({ trail_id = selection.clawmark.trail_id })
         end)
 
         return true

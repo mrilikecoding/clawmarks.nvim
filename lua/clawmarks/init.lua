@@ -270,6 +270,8 @@ function M.setup(opts)
       '## Picker Keybindings',
       '  <CR>      Jump to clawmark / Open trail clawmarks',
       '  <C-r>     Show references for selected clawmark',
+      '  <C-t>     Switch to a different trail (in clawmarks picker)',
+      '  <C-p>     Pivot to clawmark\'s trail (in references picker)',
       '',
       '## Commands',
       '  :ClawmarksRefresh       Reload from .clawmarks.json',
